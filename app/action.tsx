@@ -45,33 +45,38 @@ interface SearchResult {
 interface ContentResult extends SearchResult {
   html: string;
 }
-// 4. Fetch search results from Brave Search API
-async function getSources(message: string, numberOfPagesToScan = config.numberOfPagesToScan): Promise<SearchResult[]> {
-  try {
-    const response = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(message)}&count=${numberOfPagesToScan}`, {
+// 4. Fetch search results from Google API
+export async function getSources(message: string): Promise<SearchResult[]> {
+  const url = 'https://google.serper.dev/search';
+  const data = JSON.stringify({
+      "q": message
+  });
+  const requestOptions: RequestInit = {
+      method: 'POST',
       headers: {
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip',
-        "X-Subscription-Token": process.env.BRAVE_SEARCH_API_KEY as string
+          'X-API-KEY': process.env.SERPER_API as string,
+          'Content-Type': 'application/json'
+      },
+      body: data
+  };
+  try {
+      const response = await fetch(url, requestOptions);
+      if (!response.ok) {
+          throw new Error(`Network response was not ok. Status: ${response.status}`);
       }
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const jsonResponse = await response.json();
-    if (!jsonResponse.web || !jsonResponse.web.results) {
-      throw new Error('Invalid API response format');
-    }
-    const final = jsonResponse.web.results.map((result: any): SearchResult => ({
-      title: result.title,
-      link: result.url,
-      snippet: result.description,
-      favicon: result.profile.img
-    }));
-    return final;
+      const responseData = await response.json();
+      if (!responseData.organic) {
+          throw new Error('Invalid API response format');
+      }
+      const final = responseData.organic.map((result: any): SearchResult => ({
+          title: result.title,
+          link: result.link,
+          favicon: result.favicons?.[0] || ''
+      }));
+      return final
   } catch (error) {
-    console.error('Error fetching search results:', error);
-    throw error;
+      console.error('Error fetching search results:', error);
+      throw error;
   }
 }
 // 5. Fetch contents of top 10 search results
